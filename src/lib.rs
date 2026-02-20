@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 #![warn(clippy::all, clippy::pedantic)]
 #![allow(
     clippy::assigning_clones,
@@ -108,11 +109,17 @@ Supported types: telegram, discord, slack, whatsapp, matrix, imessage, email.
 
 Examples:
   zeroclaw channel add telegram '{\"bot_token\":\"...\",\"name\":\"my-bot\"}'
-  zeroclaw channel add discord '{\"bot_token\":\"...\",\"name\":\"my-discord\"}'")]
+  zeroclaw channel add discord '{\"token\":\"...\",\"name\":\"my-discord\"}'
+  zeroclaw channel add slack '{\"bot_token\":\"...\",\"app_token\":\"...\",\"name\":\"my-slack\"}'
+  zeroclaw channel add whatsapp '{\"phone_number_id\":\"...\",\"access_token\":\"...\",\"name\":\"my-wa\"}'
+  zeroclaw channel add matrix '{\"homeserver_url\":\"...\",\"username\":\"...\",\"password\":\"...\",\"name\":\"my-matrix\"}'
+  zeroclaw channel add imessage '{\"name\":\"my-imessage\"}'
+  zeroclaw channel add email '{\"name\":\"my-email\",\"imap\":\"...\",\"smtp\":\"...\",\"username\":\"...\",\"password\":\"...\"}'
+")]
     Add {
         /// Channel type (telegram, discord, slack, whatsapp, matrix, imessage, email)
         channel_type: String,
-        /// Optional configuration as JSON
+        /// JSON string with channel configuration
         config: String,
     },
     /// Remove a channel configuration
@@ -120,271 +127,177 @@ Examples:
         /// Channel name to remove
         name: String,
     },
-    /// Bind a Telegram identity (username or numeric user ID) into allowlist
-    #[command(long_about = "\
-Bind a Telegram identity into the allowlist.
-
-Adds a Telegram username (without the '@' prefix) or numeric user \
-ID to the channel allowlist so the agent will respond to messages \
-from that identity.
-
-Examples:
-  zeroclaw channel bind-telegram zeroclaw_user
-  zeroclaw channel bind-telegram 123456789")]
-    BindTelegram {
-        /// Telegram identity to allow (username without '@' or numeric user ID)
-        identity: String,
-    },
 }
 
-/// Skills management subcommands
-#[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum SkillCommands {
-    /// List all installed skills
-    List,
-    /// Install a new skill from a git URL (HTTPS/SSH) or local path
-    Install {
-        /// Source git URL (HTTPS/SSH) or local path
-        source: String,
-    },
-    /// Remove an installed skill
-    Remove {
-        /// Skill name to remove
-        name: String,
-    },
-}
-
-/// Migration subcommands
-#[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum MigrateCommands {
-    /// Import memory from an `OpenClaw` workspace into this `ZeroClaw` workspace
-    Openclaw {
-        /// Optional path to `OpenClaw` workspace (defaults to ~/.openclaw/workspace)
-        #[arg(long)]
-        source: Option<std::path::PathBuf>,
-
-        /// Validate and preview migration without writing any data
-        #[arg(long)]
-        dry_run: bool,
-    },
-}
-
-/// Cron subcommands
-#[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum CronCommands {
-    /// List all scheduled tasks
-    List,
-    /// Add a new scheduled task
-    #[command(long_about = "\
-Add a new recurring scheduled task.
-
-Uses standard 5-field cron syntax: 'min hour day month weekday'. \
-Times are evaluated in UTC by default; use --tz with an IANA \
-timezone name to override.
-
-Examples:
-  zeroclaw cron add '0 9 * * 1-5' 'Good morning' --tz America/New_York
-  zeroclaw cron add '*/30 * * * *' 'Check system health'")]
-    Add {
-        /// Cron expression
-        expression: String,
-        /// Optional IANA timezone (e.g. America/Los_Angeles)
-        #[arg(long)]
-        tz: Option<String>,
-        /// Command to run
-        command: String,
-    },
-    /// Add a one-shot scheduled task at an RFC3339 timestamp
-    #[command(long_about = "\
-Add a one-shot task that fires at a specific UTC timestamp.
-
-The timestamp must be in RFC 3339 format (e.g. 2025-01-15T14:00:00Z).
-
-Examples:
-  zeroclaw cron add-at 2025-01-15T14:00:00Z 'Send reminder'
-  zeroclaw cron add-at 2025-12-31T23:59:00Z 'Happy New Year!'")]
-    AddAt {
-        /// One-shot timestamp in RFC3339 format
-        at: String,
-        /// Command to run
-        command: String,
-    },
-    /// Add a fixed-interval scheduled task
-    #[command(long_about = "\
-Add a task that repeats at a fixed interval.
-
-Interval is specified in milliseconds. For example, 60000 = 1 minute.
-
-Examples:
-  zeroclaw cron add-every 60000 'Ping heartbeat'     # every minute
-  zeroclaw cron add-every 3600000 'Hourly report'    # every hour")]
-    AddEvery {
-        /// Interval in milliseconds
-        every_ms: u64,
-        /// Command to run
-        command: String,
-    },
-    /// Add a one-shot delayed task (e.g. "30m", "2h", "1d")
-    #[command(long_about = "\
-Add a one-shot task that fires after a delay from now.
-
-Accepts human-readable durations: s (seconds), m (minutes), \
-h (hours), d (days).
-
-Examples:
-  zeroclaw cron once 30m 'Run backup in 30 minutes'
-  zeroclaw cron once 2h 'Follow up on deployment'
-  zeroclaw cron once 1d 'Daily check'")]
-    Once {
-        /// Delay duration
-        delay: String,
-        /// Command to run
-        command: String,
-    },
-    /// Remove a scheduled task
-    Remove {
-        /// Task ID
-        id: String,
-    },
-    /// Update a scheduled task
-    #[command(long_about = "\
-Update one or more fields of an existing scheduled task.
-
-Only the fields you specify are changed; others remain unchanged.
-
-Examples:
-  zeroclaw cron update <task-id> --expression '0 8 * * *'
-  zeroclaw cron update <task-id> --tz Europe/London --name 'Morning check'
-  zeroclaw cron update <task-id> --command 'Updated message'")]
-    Update {
-        /// Task ID
-        id: String,
-        /// New cron expression
-        #[arg(long)]
-        expression: Option<String>,
-        /// New IANA timezone
-        #[arg(long)]
-        tz: Option<String>,
-        /// New command to run
-        #[arg(long)]
-        command: Option<String>,
-        /// New job name
-        #[arg(long)]
-        name: Option<String>,
-    },
-    /// Pause a scheduled task
-    Pause {
-        /// Task ID
-        id: String,
-    },
-    /// Resume a paused task
-    Resume {
-        /// Task ID
-        id: String,
-    },
-}
-
-/// Integration subcommands
+/// Integration management subcommands
 #[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum IntegrationCommands {
-    /// Show details about a specific integration
-    Info {
+    /// List all available integrations
+    List,
+    /// Show available actions for a specific integration
+    Actions {
         /// Integration name
+        integration: String,
+    },
+    /// Configure or update an integration
+    Configure {
+        /// Integration name
+        integration: String,
+        /// JSON string with integration configuration
+        config: String,
+    },
+    /// Remove an integration configuration
+    Remove {
+        /// Integration name
+        integration: String,
+    },
+    /// Test an integration configuration
+    Test {
+        /// Integration name
+        integration: String,
+    },
+}
+
+/// Agent management subcommands
+#[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AgentCommands {
+    /// Create a new custom agent
+    Create {
+        /// Agent name
+        name: String,
+        /// Agent description
+        description: String,
+        /// JSON string with agent configuration
+        config: String,
+    },
+    /// List all custom agents
+    List,
+    /// Show details of a specific agent
+    Show {
+        /// Agent name
+        name: String,
+    },
+    /// Update an existing agent
+    Update {
+        /// Agent name
+        name: String,
+        /// JSON string with agent configuration updates
+        config: String,
+    },
+    /// Remove a custom agent
+    Remove {
+        /// Agent name
         name: String,
     },
 }
 
-/// Hardware discovery subcommands
+/// Skill management subcommands
 #[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum HardwareCommands {
-    /// Enumerate USB devices (VID/PID) and show known boards
-    #[command(long_about = "\
-Enumerate USB devices and show known boards.
-
-Scans connected USB devices by VID/PID and matches them against \
-known development boards (STM32 Nucleo, Arduino, ESP32).
-
-Examples:
-  zeroclaw hardware discover")]
-    Discover,
-    /// Introspect a device by path (e.g. /dev/ttyACM0)
-    #[command(long_about = "\
-Introspect a device by its serial or device path.
-
-Opens the specified device path and queries for board information, \
-firmware version, and supported capabilities.
-
-Examples:
-  zeroclaw hardware introspect /dev/ttyACM0
-  zeroclaw hardware introspect COM3")]
-    Introspect {
-        /// Serial or device path
-        path: String,
+pub enum SkillCommands {
+    /// List all available skills
+    List,
+    /// Show details of a specific skill
+    Show {
+        /// Skill name
+        name: String,
     },
-    /// Get chip info via USB (probe-rs over ST-Link). No firmware needed on target.
-    #[command(long_about = "\
-Get chip info via USB using probe-rs over ST-Link.
-
-Queries the target MCU directly through the debug probe without \
-requiring any firmware on the target board.
-
-Examples:
-  zeroclaw hardware info
-  zeroclaw hardware info --chip STM32F401RETx")]
-    Info {
-        /// Chip name (e.g. STM32F401RETx). Default: STM32F401RETx for Nucleo-F401RE
-        #[arg(long, default_value = "STM32F401RETx")]
-        chip: String,
+    /// Enable a skill
+    Enable {
+        /// Skill name
+        name: String,
+    },
+    /// Disable a skill
+    Disable {
+        /// Skill name
+        name: String,
     },
 }
 
-/// Peripheral (hardware) management subcommands
+/// Memory management subcommands
 #[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum PeripheralCommands {
-    /// List configured peripherals
-    List,
-    /// Add a peripheral (board path, e.g. nucleo-f401re /dev/ttyACM0)
-    #[command(long_about = "\
-Add a peripheral by board type and transport path.
+pub enum MemoryCommands {
+    /// Search memories
+    Search {
+        /// Search query
+        query: String,
+    },
+    /// Show recent memories
+    Recent {
+        /// Number of memories to show
+        #[arg(default_value = "10")]
+        limit: usize,
+    },
+    /// Clear all memories
+    Clear,
+}
 
-Registers a hardware board so the agent can use its tools (GPIO, \
-sensors, actuators). Use 'native' as path for local GPIO on \
-single-board computers like Raspberry Pi.
-
-Supported boards: nucleo-f401re, rpi-gpio, esp32, arduino-uno.
-
-Examples:
-  zeroclaw peripheral add nucleo-f401re /dev/ttyACM0
-  zeroclaw peripheral add rpi-gpio native
-  zeroclaw peripheral add esp32 /dev/ttyUSB0")]
-    Add {
-        /// Board type (nucleo-f401re, rpi-gpio, esp32)
-        board: String,
-        /// Path for serial transport (/dev/ttyACM0) or "native" for local GPIO
+/// RAG (Retrieval Augmented Generation) management subcommands
+#[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RagCommands {
+    /// Ingest documents into RAG system
+    Ingest {
+        /// Path to document or directory
         path: String,
     },
-    /// Flash ZeroClaw firmware to Arduino (creates .ino, installs arduino-cli if needed, uploads)
-    #[command(long_about = "\
-Flash ZeroClaw firmware to an Arduino board.
-
-Generates the .ino sketch, installs arduino-cli if it is not \
-already available, compiles, and uploads the firmware.
-
-Examples:
-  zeroclaw peripheral flash
-  zeroclaw peripheral flash --port /dev/cu.usbmodem12345
-  zeroclaw peripheral flash -p COM3")]
-    Flash {
-        /// Serial port (e.g. /dev/cu.usbmodem12345). If omitted, uses first arduino-uno from config.
-        #[arg(short, long)]
-        port: Option<String>,
+    /// Search RAG system
+    Search {
+        /// Search query
+        query: String,
+        /// Number of results to return
+        #[arg(default_value = "5")]
+        limit: usize,
     },
-    /// Setup Arduino Uno Q Bridge app (deploy GPIO bridge for agent control)
-    SetupUnoQ {
-        /// Uno Q IP (e.g. 192.168.0.48). If omitted, assumes running ON the Uno Q.
-        #[arg(long)]
-        host: Option<String>,
+    /// List all indexed documents
+    List,
+    /// Remove documents from RAG system
+    Remove {
+        /// Document ID or path
+        id: String,
     },
-    /// Flash ZeroClaw firmware to Nucleo-F401RE (builds + probe-rs run)
-    FlashNucleo,
+}
+
+/// Tool management subcommands
+#[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ToolCommands {
+    /// List all available tools
+    List,
+    /// Show details of a specific tool
+    Show {
+        /// Tool name
+        name: String,
+    },
+    /// Install a new tool
+    Install {
+        /// Tool name or URL
+        source: String,
+    },
+    /// Uninstall a tool
+    Uninstall {
+        /// Tool name
+        name: String,
+    },
+}
+
+/// Provider management subcommands
+#[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ProviderCommands {
+    /// List all available providers
+    List,
+    /// Configure a provider
+    Configure {
+        /// Provider name
+        provider: String,
+        /// JSON string with provider configuration
+        config: String,
+    },
+    /// Remove a provider configuration
+    Remove {
+        /// Provider name
+        provider: String,
+    },
+    /// Test a provider configuration
+    Test {
+        /// Provider name
+        provider: String,
+    },
 }
