@@ -9,9 +9,3 @@ healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-
-[[services]]
-name = "zeroclaw"
-
-[services.variables]
-PORT = "3000"
