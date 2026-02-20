@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
 # ── Stage 1: Build ──────────────────────────────────────────────────
-FROM rust:1.93-slim@sha256:9663b80a1621253d30b146454f903de48f0af925c967be48c84745537cd35d8b AS builder
+FROM rust:1.93-slim AS builder
 
 WORKDIR /app
 
 # Install build dependencies
-RUN --mount=type=cache,id=zeroclaw-apt-cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=zeroclaw-apt-lib,target=/var/lib/apt,sharing=locked \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
@@ -20,45 +20,32 @@ RUN mkdir -p src benches crates/robot-kit/src \
     && echo "fn main() {}" > src/main.rs \
     && echo "fn main() {}" > benches/agent_benchmarks.rs \
     && echo "pub fn placeholder() {}" > crates/robot-kit/src/lib.rs
-RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=zeroclaw-target,target=/app/target,sharing=locked \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
     cargo build --release --locked
 RUN rm -rf src benches crates/robot-kit/src
 
-# 2. Copy only build-relevant source paths (avoid cache-busting on docs/tests/scripts)
+# 2. Copy only build-relevant source paths
 COPY src/ src/
 COPY benches/ benches/
 COPY crates/ crates/
 COPY firmware/ firmware/
-RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=zeroclaw-target,target=/app/target,sharing=locked \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
     cargo build --release --locked && \
     cp target/release/zeroclaw /app/zeroclaw && \
     strip /app/zeroclaw
 
-# Prepare runtime directory structure and default config inline (no extra stage)
+# Prepare runtime directory and default config
 RUN mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace && \
-    cat > /zeroclaw-data/.zeroclaw/config.toml <<EOF && \
+    printf '[gateway]\nport = 3000\nhost = "0.0.0.0"\nallow_public_bind = true\n\napi_key = ""\ndefault_provider = "openrouter"\ndefault_model = "anthropic/claude-sonnet-4-20250514"\ndefault_temperature = 0.7\nworkspace_dir = "/zeroclaw-data/workspace"\nconfig_path = "/zeroclaw-data/.zeroclaw/config.toml"\n' > /zeroclaw-data/.zeroclaw/config.toml && \
     chown -R 65534:65534 /zeroclaw-data
-workspace_dir = "/zeroclaw-data/workspace"
-config_path = "/zeroclaw-data/.zeroclaw/config.toml"
-api_key = ""
-default_provider = "openrouter"
-default_model = "anthropic/claude-sonnet-4-20250514"
-default_temperature = 0.7
-
-[gateway]
-port = 3000
-host = "[::]"
-allow_public_bind = true
-EOF
 
 # ── Stage 2: Development Runtime (Debian) ────────────────────
 FROM debian:trixie-slim AS dev
 
-# Install essential runtime dependencies only
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
