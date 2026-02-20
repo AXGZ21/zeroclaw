@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
-# ── Stage 1: Build ────────────────────────────────────────────
+# ── Stage 1: Build ──────────────────────────────────────────────────
 FROM rust:1.93-slim@sha256:9663b80a1621253d30b146454f903de48f0af925c967be48c84745537cd35d8b AS builder
 
 WORKDIR /app
 
 # Install build dependencies
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+RUN --mount=type=cache,id=zeroclaw-apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=zeroclaw-apt-lib,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
@@ -56,9 +56,9 @@ allow_public_bind = true
 EOF
 
 # ── Stage 2: Development Runtime (Debian) ────────────────────
-FROM debian:trixie-slim@sha256:f6e2cfac5cf956ea044b4bd75e6397b4372ad88fe00908045e9a0d21712ae3ba AS dev
+FROM debian:trixie-slim AS dev
 
-# Install essential runtime dependencies only (use docker-compose.override.yml for dev tools)
+# Install essential runtime dependencies only
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
@@ -67,46 +67,20 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /zeroclaw-data /zeroclaw-data
 COPY --from=builder /app/zeroclaw /usr/local/bin/zeroclaw
 
-# Overwrite minimal config with DEV template (Ollama defaults)
-COPY dev/config.template.toml /zeroclaw-data/.zeroclaw/config.toml
-RUN chown 65534:65534 /zeroclaw-data/.zeroclaw/config.toml
-
-# Environment setup
-# Use consistent workspace path
-ENV ZEROCLAW_WORKSPACE=/zeroclaw-data/workspace
-ENV HOME=/zeroclaw-data
-# Defaults for local dev (Ollama) - matches config.template.toml
-ENV PROVIDER="ollama"
-ENV ZEROCLAW_MODEL="llama3.2"
-ENV ZEROCLAW_GATEWAY_PORT=3000
-
-# Note: API_KEY is intentionally NOT set here to avoid confusion.
-# It is set in config.toml as the Ollama URL.
-
-WORKDIR /zeroclaw-data
 USER 65534:65534
+WORKDIR /zeroclaw-data/workspace
+
 EXPOSE 3000
-ENTRYPOINT ["zeroclaw"]
-CMD ["gateway"]
+CMD ["zeroclaw", "gateway"]
 
-# ── Stage 3: Production Runtime (Distroless) ─────────────────
-FROM gcr.io/distroless/cc-debian13:nonroot@sha256:84fcd3c223b144b0cb6edc5ecc75641819842a9679a3a58fd6294bec47532bf7 AS release
+# ── Stage 3: Production Runtime (Distroless) ────────────────────────
+FROM gcr.io/distroless/cc-debian12:nonroot AS prod
 
+COPY --from=builder --chown=65534:65534 /zeroclaw-data /zeroclaw-data
 COPY --from=builder /app/zeroclaw /usr/local/bin/zeroclaw
-COPY --from=builder /zeroclaw-data /zeroclaw-data
 
-# Environment setup
-ENV ZEROCLAW_WORKSPACE=/zeroclaw-data/workspace
-ENV HOME=/zeroclaw-data
-# Default provider (model is set in config.toml, not here,
-# so config file edits are not silently overridden)
-ENV PROVIDER="openrouter"
-ENV ZEROCLAW_GATEWAY_PORT=3000
+USER nonroot:nonroot
+WORKDIR /zeroclaw-data/workspace
 
-# API_KEY must be provided at runtime!
-
-WORKDIR /zeroclaw-data
-USER 65534:65534
 EXPOSE 3000
-ENTRYPOINT ["zeroclaw"]
-CMD ["gateway"]
+CMD ["zeroclaw", "gateway"]
