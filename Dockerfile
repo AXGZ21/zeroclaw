@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
-# ── Stage 1: Build ──────────────────────────────────────────────────
-FROM rust:1.93-slim AS builder
+# ── Stage 1: Build ──────────────────────────────────────────────────────
+FROM rust:1.85-slim AS builder
 
 WORKDIR /app
 
@@ -43,7 +43,7 @@ RUN mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace && \
     printf '[gateway]\nport = 3000\nhost = "0.0.0.0"\nallow_public_bind = true\n\napi_key = ""\ndefault_provider = "openrouter"\ndefault_model = "anthropic/claude-sonnet-4-20250514"\ndefault_temperature = 0.7\nworkspace_dir = "/zeroclaw-data/workspace"\nconfig_path = "/zeroclaw-data/.zeroclaw/config.toml"\n' > /zeroclaw-data/.zeroclaw/config.toml && \
     chown -R 65534:65534 /zeroclaw-data
 
-# ── Stage 2: Development Runtime (Debian) ────────────────────
+# ── Stage 2: Development Runtime (Debian) ──────────────────────
 FROM debian:trixie-slim AS dev
 
 RUN apt-get update && apt-get install -y \
@@ -60,14 +60,14 @@ WORKDIR /zeroclaw-data/workspace
 EXPOSE 3000
 CMD ["zeroclaw", "gateway"]
 
-# ── Stage 3: Production Runtime (Distroless) ────────────────────────
+# ── Stage 3: Production Runtime (Distroless) ───────────────────────────────
 FROM gcr.io/distroless/cc-debian12:nonroot AS prod
 
 COPY --from=builder --chown=65534:65534 /zeroclaw-data /zeroclaw-data
 COPY --from=builder /app/zeroclaw /usr/local/bin/zeroclaw
 
-USER nonroot:nonroot
+USER 65534:65534
 WORKDIR /zeroclaw-data/workspace
 
 EXPOSE 3000
-CMD ["zeroclaw", "gateway"]
+CMD ["/usr/local/bin/zeroclaw", "gateway"]
