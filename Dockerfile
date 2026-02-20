@@ -1,4 +1,4 @@
-FROM rustlang/rust:nightly-slim AS builder
+FROM rust:slim-bookworm AS builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y pkg-config && rm -rf /var/lib/apt/lists/*
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
