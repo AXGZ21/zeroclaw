@@ -26,9 +26,9 @@ RUN mkdir -p src benches crates/robot-kit/src crates/zeroclaw-types/src crates/z
     && echo "pub fn placeholder() {}" > crates/robot-kit/src/lib.rs \
     && echo "pub fn placeholder() {}" > crates/zeroclaw-types/src/lib.rs \
     && echo "pub fn placeholder() {}" > crates/zeroclaw-core/src/lib.rs
-RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=zeroclaw-target,target=/app/target,sharing=locked \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
     if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
       cargo build --release --features "$ZEROCLAW_CARGO_FEATURES"; \
     else \
@@ -60,9 +60,9 @@ RUN mkdir -p web/dist && \
         '  </body>' \
         '</html>' > web/dist/index.html; \
     fi
-RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=zeroclaw-target,target=/app/target,sharing=locked \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
     if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
       cargo build --release --features "$ZEROCLAW_CARGO_FEATURES"; \
     else \
