@@ -8,9 +8,7 @@ ARG ZEROCLAW_CARGO_FEATURES=""
 
 # Install build dependencies
 # Install build dependencies
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
@@ -27,10 +25,7 @@ RUN mkdir -p src benches crates/robot-kit/src crates/zeroclaw-types/src crates/z
     && echo "pub fn placeholder() {}" > crates/robot-kit/src/lib.rs \
     && echo "pub fn placeholder() {}" > crates/zeroclaw-types/src/lib.rs \
     && echo "pub fn placeholder() {}" > crates/zeroclaw-core/src/lib.rs
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/app/target,sharing=locked \
-    if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
+RUN if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
       cargo build --release --features "$ZEROCLAW_CARGO_FEATURES"; \
     else \
       cargo build --release --locked; \
@@ -61,10 +56,7 @@ RUN mkdir -p web/dist && \
         '  </body>' \
         '</html>' > web/dist/index.html; \
     fi
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/app/target,sharing=locked \
-    if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
+RUN if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
       cargo build --release --features "$ZEROCLAW_CARGO_FEATURES"; \
     else \
       cargo build --release --locked; \
