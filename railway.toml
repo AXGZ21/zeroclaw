@@ -1,0 +1,19 @@
+# Railway configuration for ZeroClaw 🦀
+# Docs: https://docs.railway.com/reference/config-as-code
+# Schema: https://railway.com/railway.schema.json
+
+"$schema" = "https://railway.com/railway.schema.json"
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+# Use the production distroless stage for minimal image size (<5MB RAM footprint)
+dockerBuildTarget = "release"
+
+[deploy]
+startCommand = "zeroclaw gateway"
+# /health returns 200 when the gateway is ready to accept connections
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

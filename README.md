@@ -83,6 +83,23 @@ Use this board for important notices (breaking changes, security advisories, mai
 
 ## Quick Start
 
+<p align="center">
+  <a href="https://railway.com/new/template?template=https://github.com/AXGZ21/zeroclaw">
+    <img src="https://railway.com/button.svg" alt="Deploy on Railway" />
+  </a>
+</p>
+
+### Option 0: One-Click Railway Deploy
+
+Deploy ZeroClaw to [Railway](https://railway.com) in seconds — no local setup required:
+
+1. Click the **Deploy on Railway** button above.
+2. Set the required `API_KEY` environment variable (your LLM provider key, e.g. OpenRouter).
+3. Optionally set `PROVIDER` (default: `openrouter`) and `ZEROCLAW_MODEL`.
+4. Click **Deploy** and Railway will build and launch ZeroClaw automatically.
+
+The gateway UI will be available at the Railway-generated domain once the build completes.
+
 ### Option 1: Homebrew (macOS/Linuxbrew)
 
 ```bash
