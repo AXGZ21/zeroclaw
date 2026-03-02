@@ -7,8 +7,9 @@ WORKDIR /app
 ARG ZEROCLAW_CARGO_FEATURES=""
 
 # Install build dependencies
-RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+ARG RAILWAY_CACHE_ID=zeroclaw
+RUN --mount=type=cache,id=${RAILWAY_CACHE_ID}-apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=${RAILWAY_CACHE_ID}-apt-lib,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
@@ -26,9 +27,9 @@ RUN mkdir -p src benches crates/robot-kit/src crates/zeroclaw-types/src crates/z
     && echo "pub fn placeholder() {}" > crates/robot-kit/src/lib.rs \
     && echo "pub fn placeholder() {}" > crates/zeroclaw-types/src/lib.rs \
     && echo "pub fn placeholder() {}" > crates/zeroclaw-core/src/lib.rs
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/app/target,sharing=locked \
+RUN --mount=type=cache,id=${RAILWAY_CACHE_ID}-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=${RAILWAY_CACHE_ID}-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=${RAILWAY_CACHE_ID}-cargo-target,target=/app/target,sharing=locked \
     if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
       cargo build --release --features "$ZEROCLAW_CARGO_FEATURES"; \
     else \
@@ -60,9 +61,9 @@ RUN mkdir -p web/dist && \
         '  </body>' \
         '</html>' > web/dist/index.html; \
     fi
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/app/target,sharing=locked \
+RUN --mount=type=cache,id=${RAILWAY_CACHE_ID}-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=${RAILWAY_CACHE_ID}-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=${RAILWAY_CACHE_ID}-cargo-target,target=/app/target,sharing=locked \
     if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
       cargo build --release --features "$ZEROCLAW_CARGO_FEATURES"; \
     else \
